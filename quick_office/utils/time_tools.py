@@ -45,10 +45,6 @@ def date_str_parser(date_str):
         return None
 
 
-# def datetime_to_str(date):
-
-
-
 def list_slicing(data_list: list, size: int):
     """
     列表切片
