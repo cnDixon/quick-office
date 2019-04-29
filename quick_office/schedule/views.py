@@ -1,4 +1,5 @@
 # Create your views here.
+import json
 
 from django.db import connection
 from django.http import HttpResponse
@@ -58,6 +59,10 @@ def run_job(request):
     else:
         res = tools.result(1, msg='params error.')
 
+    # TODO: 获取任务后, 生成任务ID, 将任务ID存至REDIS, 启动线程执行任务, 并返回任务ID
+    #  线程完成后, 更新任务状态
+    #  或者开发一个专属的调度客户端, 仅供QuickOffice使用
+
     return HttpResponse(tools.result(data=res))
 
 
@@ -86,7 +91,8 @@ def job_info(request):
       etl_job.respon_user,
       (
       SELECT
-        GROUP_CONCAT( 'step_id: ', setp_id, '   script: ', script, '   enable: ', `enable` SEPARATOR '\n') 
+        GROUP_CONCAT(
+         '{{"step_id": "', setp_id, '", "script": "', script, '", "enable": "', `enable`, '"}}' SEPARATOR '\001') 
       FROM
         dmp_schedule.etl_job_steps 
       WHERE
@@ -96,7 +102,8 @@ def job_info(request):
       (
       SELECT
         GROUP_CONCAT(
-         'stream_sys: ', stream_system, '   stream_job: ', stream_job, '   enable: ', `enable` SEPARATOR '\n') 
+         '{{"stream_sys": "', stream_system, '", "stream_job": "', stream_job, '", "enable": "', `enable`, '"}}' 
+         SEPARATOR '\001') 
       FROM
         dmp_schedule.etl_job_stream 
       WHERE
@@ -106,7 +113,8 @@ def job_info(request):
       (
       SELECT
         GROUP_CONCAT(
-         'stream_by_sys: ', etl_system, '   stream_by_job: ', etl_job, '   enable: ', `enable` SEPARATOR '\n') 
+         '{{"stream_by_sys": "', etl_system, '", "stream_by_job": "', etl_job, '", "enable": "', `enable`, '"}}'
+          SEPARATOR '\001') 
       FROM
         dmp_schedule.etl_job_stream 
       WHERE
@@ -115,7 +123,8 @@ def job_info(request):
       ) stream_by,
       (
       SELECT
-        GROUP_CONCAT( 'sys: ', dependency_system, '   job: ', dependency_job, '   enable: ', `enable` SEPARATOR '\n') 
+        GROUP_CONCAT( '{{"sys": "', dependency_system, '", "job": "', dependency_job, '", "enable": "', `enable`, '"}}'
+         SEPARATOR '\001') 
       FROM
         dmp_schedule.etl_job_dependency 
       WHERE
@@ -124,7 +133,8 @@ def job_info(request):
       ) dependencies,
       (
       SELECT
-        GROUP_CONCAT( 'sys: ', etl_system, '   job: ', etl_job, '   enable: ', `enable` SEPARATOR '\n') 
+        GROUP_CONCAT( '{{"sys": "', etl_system, '", "job": "', etl_job, '", "enable": "', `enable`, '"}}'
+         SEPARATOR '\001') 
       FROM
         dmp_schedule.etl_job_dependency 
       WHERE
@@ -134,7 +144,8 @@ def job_info(request):
       (
       SELECT
         GROUP_CONCAT(
-         'date_offset: ', date_offset, '   trigger_offset: ', trigger_offset, '   enable: ', `enable` SEPARATOR '\n') 
+         '{{"date_offset": "', date_offset, '", "trigger_offset": "', trigger_offset, '", "enable": "', `enable`, '"}}'
+          SEPARATOR '\001') 
       FROM
         dmp_schedule.etl_time_trigger 
       WHERE
@@ -144,8 +155,8 @@ def job_info(request):
       (
       SELECT
         GROUP_CONCAT(
-         'window_type: ', window_type, '   date_type: ', date_type, '   start_window: ', start_window, 
-         '   end_window: ', end_window, '   enable: ', `enable` SEPARATOR '\n') 
+         '{{"window_type": "', window_type, '", "date_type": "', date_type, '", "start_window": "', start_window, 
+         '", "end_window": "', end_window, '", "enable": "', `enable`, '"}}' SEPARATOR '\001') 
       FROM
         dmp_schedule.etl_time_window 
       WHERE
@@ -167,6 +178,14 @@ def job_info(request):
      last_start_time, last_end_time, description, user, scripts, streamed, stream_by, dependencies, dependency_by,
      trigger_info, window_info) = res
 
+    scripts = [json.loads(script) for script in scripts.split('\001')] if scripts else list()
+    streamed = [json.loads(stream) for stream in streamed.split('\001')] if streamed else list()
+    stream_by = [json.loads(stream) for stream in stream_by.split('\001')] if stream_by else list()
+    dependencies = [json.loads(dependency) for dependency in dependencies.split('\001')] if dependencies else list()
+    dependency_by = [json.loads(dependency) for dependency in dependency_by.split('\001')] if dependency_by else list()
+    trigger_info = [json.loads(trigger) for trigger in trigger_info.split('\001')] if trigger_info else list()
+    window_info = [json.loads(window) for window in window_info.split('\001')] if window_info else list()
+
     res = {
         'etl_sys': etl_sys, 'etl_job': etl_job, 'cycle': cycle, 'enable': enable, 'priority': priority,
         'etl_group': etl_group, 'last_job_id': last_job_id, 'last_job_status': last_job_status,
@@ -178,3 +197,6 @@ def job_info(request):
     }
 
     return HttpResponse(tools.result(data=res))
+
+# TODO: 自定义命令 ssh@xxxxx ~
+#  也支持 ${YYYYMMDD} 这样子 ~
