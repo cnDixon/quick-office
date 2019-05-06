@@ -190,8 +190,9 @@ def job_info(request):
         'etl_sys': etl_sys, 'etl_job': etl_job, 'cycle': cycle, 'enable': enable, 'priority': priority,
         'etl_group': etl_group, 'last_job_id': last_job_id, 'last_job_status': last_job_status,
         'last_tx_date': last_tx_date, 'last_executor': last_executor,
-        'last_start_time': last_start_time.strftime('%Y-%m-%d'),
-        'last_end_time': last_end_time.strftime('%Y%m%d'), 'description': description, 'user': user, 'scripts': scripts,
+        'last_start_time': last_start_time.strftime('%Y-%m-%d %H:%M:%S'),
+        'last_end_time': last_end_time.strftime('%Y-%m-%d %H:%M:%S'),
+        'description': description, 'user': user, 'scripts': scripts,
         'streamed': streamed, 'stream_by': stream_by, 'dependencies': dependencies, 'dependency_by': dependency_by,
         'trigger_info': trigger_info, 'window_info': window_info
     }
