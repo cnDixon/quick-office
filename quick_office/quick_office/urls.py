@@ -20,8 +20,8 @@ from schedule import views
 
 urlpatterns = [
     url(r'^$', views.job_status),
-    path('schedule/jobStatus', views.job_status),
-    path('schedule/runJob', views.run_job),
-    path('schedule/getUser', views.get_user),
+    path('schedule/job_status', views.job_status),
+    path('schedule/run_job', views.run_job),
+    path('schedule/get_user', views.get_user),
     path('schedule/job_info', views.job_info),
 ]
