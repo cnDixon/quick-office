@@ -24,4 +24,5 @@ urlpatterns = [
     path('schedule/run_job', views.run_job),
     path('schedule/get_user', views.get_user),
     path('schedule/job_info', views.job_info),
+    path('schedule/all_jobs', views.all_jobs),
 ]

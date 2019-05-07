@@ -1,5 +1,8 @@
 # Create your views here.
+
+
 import json
+import subprocess
 
 from django.db import connection
 from django.http import HttpResponse
@@ -55,15 +58,55 @@ def run_job(request):
     tx_dt = request.GET.get('tx_dt', None)
 
     if etl_sys and etl_job and tx_dt and time_tools.date_str_parser(tx_dt):
-        res = tools.result()
+        script = 'cd /home/schedule/bin;./run_job.py -s {sys} -t {job} -d {dt}'.format(
+            sys=etl_sys, job=etl_job, dt=tx_dt)
+        # subprocess.Popen(script)
+        res = tools.result(data=script)
     else:
         res = tools.result(1, msg='params error.')
 
     # TODO: 获取任务后, 生成任务ID, 将任务ID存至REDIS, 启动线程执行任务, 并返回任务ID
     #  线程完成后, 更新任务状态
-    #  或者开发一个专属的调度客户端, 仅供QuickOffice使用
+    #  或开发一个专属的调度客户端, 仅供QuickOffice使用
 
-    return HttpResponse(tools.result(data=res))
+    return HttpResponse(res)
+
+
+def all_jobs(request):
+    user = request.GET.get('user', None)
+    status = request.GET.get('status', None)
+    etl_sys = request.GET.get('etl_sys', None)
+
+    etl_sys = "etl_system = '{}'".format(etl_sys) if etl_sys else str()
+    status = "last_jobstatus = '{}'".format(status) if status else str()
+    user = "respon_user LIKE '%{}%'".format(user) if user else str()
+
+    statement = ' AND '.join([query for query in [etl_sys, status, user] if query])
+
+    statement = 'WHERE ' + statement if statement else str()
+
+    sql = """
+    SELECT
+      `etl_system`, `etl_job`, `last_jobstatus`, `last_starttime`, `last_endtime`
+    FROM 
+      `dmp_schedule`.`etl_job` 
+    {statement}
+    """.format(statement=statement)
+
+    with connection.cursor() as cursor:
+        cursor.execute(sql)
+        res = cursor.fetchall()
+
+    jobs = list()
+    for etl_system, etl_job, last_status, last_start, last_end in res:
+        last_start = last_start.strftime('%Y-%m-%d %H:%M:%S') if last_start else str()
+        last_end = last_end.strftime('%Y-%m-%d %H:%M:%S') if last_end else str()
+        jobs.append({
+            'etl_sys': etl_system, 'etl_job': etl_job, 'last_status': last_status,
+            'last_start': last_start, 'last_end': last_end
+        })
+
+    return HttpResponse(tools.result(data=jobs))
 
 
 def job_info(request):
@@ -186,12 +229,14 @@ def job_info(request):
     trigger_info = [json.loads(trigger) for trigger in trigger_info.split('\001')] if trigger_info else list()
     window_info = [json.loads(window) for window in window_info.split('\001')] if window_info else list()
 
+    last_start_time = last_start_time.strftime('%Y-%m-%d %H:%M:%S') if last_start_time else str()
+    last_end_time = last_end_time.strftime('%Y-%m-%d %H:%M:%S') if last_end_time else str()
+
     res = {
         'etl_sys': etl_sys, 'etl_job': etl_job, 'cycle': cycle, 'enable': enable, 'priority': priority,
         'etl_group': etl_group, 'last_job_id': last_job_id, 'last_job_status': last_job_status,
         'last_tx_date': last_tx_date, 'last_executor': last_executor,
-        'last_start_time': last_start_time.strftime('%Y-%m-%d %H:%M:%S'),
-        'last_end_time': last_end_time.strftime('%Y-%m-%d %H:%M:%S'),
+        'last_start_time': last_start_time, 'last_end_time': last_end_time,
         'description': description, 'user': user, 'scripts': scripts,
         'streamed': streamed, 'stream_by': stream_by, 'dependencies': dependencies, 'dependency_by': dependency_by,
         'trigger_info': trigger_info, 'window_info': window_info
